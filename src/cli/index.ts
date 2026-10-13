@@ -1,11 +1,15 @@
 /**
- * AutoSlave minimal CLI (Phase 1: direct mode — talks straight to the adapter.
- * The daemon client arrives in Phase 2; `autoslave run` does not exist yet.)
+ * AutoSlave CLI (Phase 2: direct mode — `run` executes the workflow in-process.
+ * pause/resume/kill coordinate with the running process through control files.)
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { OpenCodeAdapter } from '../adapter/adapter.js';
 import { AgentRegistry } from '../registry/registry.js';
 import type { AgentRole } from '../registry/registry.js';
 import { discoverConnection } from '../adapter/client.js';
+import { StateStore, autoslaveHome } from '../store/store.js';
+import { WorkflowEngine } from '../workflow/engine.js';
 import { readFileSync } from 'node:fs';
 
 function version(): string {
@@ -17,7 +21,7 @@ function version(): string {
 }
 
 function help(): string {
-  return `autoslave ${version()} — coordinate OpenCode sessions (Phase 1 direct mode; no daemon yet)
+  return `autoslave ${version()} — coordinate OpenCode sessions
 Usage:
   autoslave agent add --session <id> --role <coder|reviewer> [--model <id>] [--workdir <dir>]
   autoslave agent add --create --dir <directory> --role <role> [--title <t>] [--model <id>]
@@ -25,7 +29,12 @@ Usage:
   autoslave agent role <agentId> <role>
   autoslave agent remove <agentId>
   autoslave send <agentId> <text...> [--wait [--timeout <ms>]]
-  autoslave status <agentId>
+  autoslave run --task "<objective>" [--plan <file>] --coder <agentId> --reviewer <agentId>
+                  [--max-iterations <n>] [--coder-timeout <ms>] [--reviewer-timeout <ms>]
+                  [--reviewer-model <provider/model>] [--review-file <path>]
+  autoslave status <agentId> | --task <taskId> | (lists tasks)
+  autoslave log [--task <taskId>] [--lines <n>] [--follow]
+  autoslave pause <taskId> | autoslave resume <taskId> | autoslave kill <taskId>
 `;
 }
 
@@ -39,7 +48,8 @@ const VALID_ROLES: AgentRole[] = ['coder', 'reviewer', 'tester', 'debugger', 'pl
 export async function main(argv: string[]): Promise<number> {
   const [cmd, sub, ...rest] = argv;
   const registry = new AgentRegistry();
-  const adapter = new OpenCodeAdapter();
+  const home = autoslaveHome();
+  const adapter = new OpenCodeAdapter({ logPath: path.join(home, 'raw.log') });
 
   if (!cmd || cmd === '--help' || cmd === '-h') {
     console.log(help());
@@ -135,6 +145,40 @@ export async function main(argv: string[]): Promise<number> {
   }
 
   if (cmd === 'status') {
+    const store = new StateStore();
+    const taskFlag = flag(rest, '--task') ?? (sub && sub.startsWith('task_') ? sub : undefined);
+    if (!taskFlag && !sub) {
+      const tasks = store.listTasks();
+      if (tasks.length === 0) console.log('no tasks yet — run `autoslave run --task ...`');
+      for (const t of tasks) {
+        console.log(`${t.id} "${t.objective.slice(0, 60)}" state=${t.state} iteration=${t.iteration}/${t.maxIterations}${t.reason ? ` reason=${t.reason.slice(0, 120)}` : ''}`);
+      }
+      return 0;
+    }
+    if (taskFlag) {
+      const t = store.getTask(taskFlag);
+      if (!t) {
+        console.error(`unknown task: ${taskFlag}`);
+        return 1;
+      }
+      const coder = registry.get(t.coderAgentId);
+      const reviewer = registry.get(t.reviewerAgentId);
+      console.log(`task ${t.id} "${t.objective}"`);
+      console.log(`  state=${t.state} iteration=${t.iteration}/${t.maxIterations}`);
+      console.log(`  coder    ${t.coderAgentId} (${coder?.model ?? '?'}) status=${coder?.status ?? '?'}`);
+      console.log(`  reviewer ${t.reviewerAgentId} (${reviewer?.model ?? '?'}) status=${reviewer?.status ?? '?'}`);
+      if (t.lastVerdict) {
+        console.log(`  last verdict: ${t.lastVerdict.status} — ${t.lastVerdict.summary.slice(0, 160)}`);
+      }
+      if (t.lastReport) {
+        console.log(`  last report: ${t.lastReport.status} — ${t.lastReport.summary.slice(0, 160)}`);
+      }
+      if (t.reason) console.log(`  reason: ${t.reason}`);
+      if (coder?.model && reviewer?.model && coder.model === reviewer.model) {
+        console.log(`  warning: coder and reviewer use the same model (${coder.model}) — not independent verification`);
+      }
+      return 0;
+    }
     const rec = sub ? registry.get(sub) : undefined;
     if (!rec) {
       console.error(`unknown agent: ${sub ?? ''}`);
@@ -145,6 +189,138 @@ export async function main(argv: string[]): Promise<number> {
     const last = history[0];
     console.log(`${rec.id} role=${rec.role} status=${rec.status} outcome=${info.outcome ?? '?'} model=${info.model?.id ?? rec.model ?? '?'} last=${last?.type}${last?.outcome ? `:${last.outcome}` : ''}`);
     return 0;
+  }
+
+  if (cmd === 'log') {
+    const store = new StateStore();
+    const lines = Number(flag(rest, '--lines') ?? 50);
+    const taskFlag = flag(rest, '--task');
+    const print = (): void => {
+      for (const row of store.readAudit(taskFlag, lines)) {
+        console.log(`${row.seq} ${row.ts} ${row.task} ${row.agent} ${row.kind} ${String(row.detail).slice(0, 220)}`);
+      }
+    };
+    print();
+    if (rest.includes('--follow')) {
+      let shown = store.readAudit(taskFlag, 100000).length;
+      const timer = setInterval(() => {
+        const rows = store.readAudit(taskFlag, 100000).slice(shown);
+        shown += rows.length;
+        for (const row of rows) {
+          console.log(`${row.seq} ${row.ts} ${row.task} ${row.agent} ${row.kind} ${String(row.detail).slice(0, 220)}`);
+        }
+      }, 1000);
+      await new Promise(() => {});
+      clearInterval(timer);
+    }
+    return 0;
+  }
+
+  if ((cmd === 'pause' || cmd === 'resume' || cmd === 'kill') && sub) {
+    const store = new StateStore();
+    const t = store.getTask(sub);
+    if (!t) {
+      console.error(`unknown task: ${sub}`);
+      return 1;
+    }
+    const active = ['CODING', 'REVIEWING', 'FIXING', 'PAUSED'].includes(t.state);
+    if (cmd === 'kill' && t.state === 'CREATED') {
+      t.state = 'KILLED';
+      t.reason = 'killed before start';
+      store.saveTask(t);
+      store.audit({ task: t.id, agent: 'user', kind: 'control', detail: 'kill before start → KILLED' });
+      console.log(`${t.id} KILLED`);
+      return 0;
+    }
+    if (!active) {
+      console.error(`task ${sub} is ${t.state} — ${cmd} applies to a running task`);
+      return 1;
+    }
+    store.requestControl(sub, cmd);
+    console.log(`${cmd} requested for ${sub} (applies at the next checkpoint)`);
+    return 0;
+  }
+
+  if (cmd === 'run') {
+    // NOTE: flags may start at `sub` position, so search the full argv.
+    const objective = flag(argv, '--task');
+    const coderId = flag(argv, '--coder');
+    const reviewerId = flag(argv, '--reviewer');
+    if (!objective || !coderId || !reviewerId) {
+      console.error('usage: autoslave run --task "<objective>" [--plan <file>] --coder <agentId> --reviewer <agentId>');
+      return 1;
+    }
+    const coder = registry.get(coderId);
+    const reviewer = registry.get(reviewerId);
+    if (!coder || !reviewer) {
+      console.error(`unknown agent(s): ${!coder ? coderId : ''} ${!reviewer ? reviewerId : ''}`);
+      return 1;
+    }
+    if (coder.sessionId === reviewer.sessionId) {
+      console.error('coder and reviewer must be different sessions');
+      return 1;
+    }
+    if (coder.role !== 'coder') console.log(`warning: ${coderId} has role ${coder.role}, expected coder`);
+    if (reviewer.role !== 'reviewer') console.log(`warning: ${reviewerId} has role ${reviewer.role}, expected reviewer`);
+    if (coder.model && reviewer.model && coder.model === reviewer.model) {
+      console.log(`warning: both agents use ${coder.model} — reviewer independence reduced (P8)`);
+    }
+    if (coder.workdir !== reviewer.workdir) {
+      console.log(`warning: coder dir ${coder.workdir} != reviewer dir ${reviewer.workdir}; reviewing ${coder.workdir}`);
+    }
+    // State/logs must live outside the agent workdir: session diffs attribute
+    // ANY file changed inside it during a turn (including our own raw.log).
+    const rel = path.relative(coder.workdir, home);
+    if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
+      console.error(`refusing: AutoSlave home ${home} is inside the coder workdir ${coder.workdir} — session diffs would be polluted. Set AUTOSLAVE_HOME to a directory outside it.`);
+      return 1;
+    }
+    const reviewerModel = flag(argv, '--reviewer-model');
+    if (reviewerModel) {
+      const [providerID, ...restModel] = reviewerModel.split('/');
+      const id = restModel.join('/');
+      if (!providerID || !id) {
+        console.error('--reviewer-model must look like provider/model');
+        return 1;
+      }
+      await adapter.setModel(reviewer.sessionId, { id, providerID });
+      console.log(`reviewer model set to ${reviewerModel}`);
+    }
+    const planPath = flag(argv, '--plan');
+    let planExcerpt = '';
+    if (planPath) {
+      try {
+        planExcerpt = fs.readFileSync(planPath, 'utf8');
+      } catch (e) {
+        console.error(`cannot read plan file: ${(e as Error).message}`);
+        return 1;
+      }
+    }
+    const store = new StateStore();
+    const engine = new WorkflowEngine({ adapter, registry, store });
+    const reviewFiles: string[] = [];
+    for (let i = 0; i < argv.length; i++) {
+      if (argv[i] === '--review-file' && argv[i + 1]) reviewFiles.push(argv[i + 1]);
+    }
+    const task = engine.createTask({
+      objective,
+      reviewObjective: flag(argv, '--review-objective'),
+      planExcerpt,
+      planPath,
+      coderAgentId: coderId,
+      reviewerAgentId: reviewerId,
+      workdir: coder.workdir,
+      reviewFiles,
+      maxIterations: Number(flag(argv, '--max-iterations') ?? 5),
+      coderTimeoutMs: Number(flag(argv, '--coder-timeout') ?? 600000),
+      reviewerTimeoutMs: Number(flag(argv, '--reviewer-timeout') ?? 300000),
+    });
+    console.log(`task ${task.id} created — state=${task.state} (iteration 1/${task.maxIterations})`);
+    const terminal = await engine.run(task.id);
+    const done = store.getTask(task.id);
+    console.log(`task ${task.id} terminal state: ${terminal}`);
+    if (done?.reason) console.log(`reason: ${done.reason}`);
+    return terminal === 'APPROVED' ? 0 : 1;
   }
 
   console.error(help());

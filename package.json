@@ -14,8 +14,9 @@
     "spike": "node spike/autoslave-spike.mjs",
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/test/",
-    "test:unit": "npm run build && node --test dist/test/adapter-normalize.test.js dist/test/registry.test.js",
+    "test:unit": "npm run build && node --test dist/test/adapter-normalize.test.js dist/test/registry.test.js dist/test/workflow.test.js",
     "test:contract": "npm run build && node --test dist/test/contract.test.js",
+    "test:phase2": "npm run build && node --test dist/test/phase2-contract.test.js",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
