@@ -22,7 +22,7 @@ if (args.includes('--version') || args.includes('-v')) {
   process.exit(0);
 }
 
-const built = path.join(root, 'dist', 'cli', 'index.js');
+const built = path.join(root, 'dist', 'src', 'cli', 'index.js');
 if (existsSync(built)) {
   await import(built);
 } else {

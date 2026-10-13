@@ -1,0 +1,12 @@
+[
+ {
+  "id": "agent_8d8fbd",
+  "status": "idle",
+  "createdAt": "2026-10-13T19:22:05.707Z",
+  "updatedAt": "2026-10-13T19:26:10.532Z",
+  "role": "reviewer",
+  "sessionId": "ses_ec954ec63ffeFqqj8MjfgbCNvR",
+  "serverUrl": "http://127.0.0.1:49374",
+  "workdir": "D:\\Things\\Work\\Projects\\Agent-Mesh\\spike\\work"
+ }
+]

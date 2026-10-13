@@ -32,7 +32,9 @@ Template per MAIN_PLAN §10. Owner: coding agent (opencode session), approver: r
 - Options: (A) `GET /api/session/{id}/diff`; (B) `git diff`.
 - Evidence: Q13, `diff-with-changes.json` (`{file, patch, additions, deletions, status}`).
 - Chosen: **(A) primary, (B) fallback/audit**. Session diff attributes changes per turn;
-  git diff covers anything outside the session's view.
+  git diff covers anything outside the session's view. Caveat: (A) returns nothing when
+  the session directory is outside a git repo — sessions must work in repos (guaranteed
+  by Phase 4 worktrees; enforced by adapter/CLI later).
 - Reversal: diff endpoint missing turn attribution needed for review packets.
 
 ## D4. Structured output (verdicts, reports)
