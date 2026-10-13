@@ -1,14 +1,17 @@
 {
-  "name": "opencode-mesh",
+  "name": "autoslave",
   "version": "0.1.0",
   "private": true,
-  "description": "Local orchestration layer connecting independent OpenCode sessions into a coordinated team",
+  "description": "AutoSlave: local orchestration layer connecting independent OpenCode sessions into a coordinated team",
   "type": "module",
+  "bin": {
+    "autoslave": "./bin/autoslave.js"
+  },
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "spike": "node spike/mesh-spike.mjs",
+    "spike": "node spike/autoslave-spike.mjs",
     "build": "tsc -p tsconfig.json",
     "test": "node --test test/",
     "typecheck": "tsc --noEmit -p tsconfig.json"

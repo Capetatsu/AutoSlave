@@ -1,4 +1,4 @@
-# OpenCode Mesh — MAIN PLAN
+# AutoSlave — MAIN PLAN
 
 > **Purpose of this document:** explain *how* the project is built and *in what order*. It is the implementation roadmap, from the smallest possible proof to the eventual one-command workflow.
 >
@@ -17,7 +17,7 @@
 
 ### 1.1 Why the MVP is the anti-scope-creep mechanism
 
-The MVP is **two real OpenCode sessions, one coder and one independent reviewer, looping through the mesh with no manual copy-paste.** It is deliberately the smallest thing that still demonstrates the central thesis: *independent agents can be turned into a collaborating team by an external layer.*
+The MVP is **two real OpenCode sessions, one coder and one independent reviewer, looping through AutoSlave with no manual copy-paste.** It is deliberately the smallest thing that still demonstrates the central thesis: *independent agents can be turned into a collaborating team by an external layer.*
 
 It works as a scope-control device because:
 
@@ -49,7 +49,7 @@ It works as a scope-control device because:
 | 3 | Deterministic verification | Post-MVP | Tests/build/lint/typecheck gate approval |
 | 4 | Isolation and safety | Post-MVP | Worktrees, static permissions, pause/kill/timeout, crash recovery |
 | 5 | Task graph + configurable agent graphs | Future | Multi-task workflows with user-defined agent connections |
-| 6 | One-command autonomous workflow | Future | `mesh run "..."` runs the whole team |
+| 6 | One-command autonomous workflow | Future | `autoslave run "..."` runs the whole team |
 
 ---
 
@@ -72,7 +72,7 @@ Each item is a question with a defined test and a defined evidence artifact. Rec
 | Q0 | Exact OpenCode version; where is it documented? | `opencode --version`; note install method | Version string in findings note |
 | Q1 | Does `opencode serve` start a local server? Port, host binding, default auth? **[VERIFY P0]** | Start it; call its health/doc endpoints | Command, port, response samples |
 | Q2 | Is an OpenAPI spec served, and does it match the installed version? **[VERIFY P0]** | Fetch the spec; save it | Saved spec file, version-stamped |
-| Q3 | Does `opencode attach <url>` connect a normal TUI tab to a running server? Do sessions created via API appear in that tab? **[VERIFY P0]** | Run server + attach tab; create a session over the API; observe | Notes plus screenshot or terminal capture (for the human record only; the mesh never depends on it) |
+| Q3 | Does `opencode attach <url>` connect a normal TUI tab to a running server? Do sessions created via API appear in that tab? **[VERIFY P0]** | Run server + attach tab; create a session over the API; observe | Notes plus screenshot or terminal capture (for the human record only; AutoSlave never depends on it) |
 | Q4 | Can a normally started `opencode` TUI also expose a port (so no server is needed)? **[VERIFY P0]** | Start TUI with port option if one exists; probe | Yes/no with command |
 | Q5 | **Session discovery:** can all sessions be listed, and can the one a given tab is displaying be identified? **[VERIFY P0]** | List sessions via API; create one in a tab; compare | Listing output; mapping method (or "not possible") |
 | Q6 | **Send prompt (sync):** can an external client send a prompt to an existing session and get the assistant reply? **[VERIFY P0]** | Call the prompt endpoint; compare with tab | Request/response samples |
@@ -82,7 +82,7 @@ Each item is a question with a defined test and a defined evidence artifact. Rec
 | Q10 | **Event reliability:** are events dropped across reconnects? Is there resume support? **[VERIFY P0]** | Kill/reopen the stream mid-prompt | Gap analysis |
 | Q11 | **`session.idle`:** is there an idle/finished signal, and when exactly does it fire? Does it fire when the agent is blocked on a permission prompt, errors, or is aborted? **[VERIFY P0]** | Trigger each condition; record events | Table: condition → events observed |
 | Q12 | **Message history:** can full history (including tool calls, file edits) be fetched for a session? Is it complete enough to be the source of truth? **[VERIFY P0]** | Fetch after a prompt; compare with events | Comparison note |
-| Q13 | **Diff/state access:** can the mesh obtain changed files and diffs (via OpenCode, or via Git directly)? **[VERIFY P0]** | Try the API; fall back to `git diff` | Chosen method |
+| Q13 | **Diff/state access:** can AutoSlave obtain changed files and diffs (via OpenCode, or via Git directly)? **[VERIFY P0]** | Try the API; fall back to `git diff` | Chosen method |
 | Q14 | **Permissions:** are permission requests visible as events? Can a client answer them? Which tool actions trigger them? Can OpenCode config pre-set allow/ask/deny per tool or per agent? **[VERIFY P0]** | Configure ask mode; trigger an edit and a shell command; respond via API | Event samples; response samples; config used |
 | Q15 | **Structured output:** does a `json_schema` response format work? Failure behavior and retry count? Works with the intended reviewer model? **[VERIFY P0]** | Request a verdict schema from the reviewer session, 20+ runs | Success rate; failure samples |
 | Q16 | **Abort:** can a running prompt be aborted? State of the session after abort? Behavior mid-tool-call? **[VERIFY P0]** | Start a long task; abort | Behavior note |
@@ -91,7 +91,7 @@ Each item is a question with a defined test and a defined evidence artifact. Rec
 | Q19 | **Model selection per session/prompt:** can coder and reviewer use different providers/models? **[VERIFY P0]** | Set per session/prompt | Confirmed model in message metadata |
 | Q20 | **Authentication:** how is the server secured (for example a password and Basic auth)? **[VERIFY P0]** | Enable and test | Config and test result |
 | Q21 | **Concurrency:** can one server host several active sessions at once without interference? **[VERIFY P0]** | Run two simultaneous prompts | Observation |
-| Q22 | **TUI control endpoints:** can the mesh show a notice or fill the prompt in a visible tab? Is that useful or a distraction? **[VERIFY P0]** | Try the endpoints | Verdict: use / ignore |
+| Q22 | **TUI control endpoints:** can AutoSlave show a notice or fill the prompt in a visible tab? Is that useful or a distraction? **[VERIFY P0]** | Try the endpoints | Verdict: use / ignore |
 | Q23 | **SDK fit:** does the official JS/TS SDK match the installed version's API? Is it generated from the served spec? Are there gaps? **[VERIFY P0]** | Install SDK; run Q6–Q16 through it | Compatibility list |
 | Q24 | **Version stability:** how fast does the API change? What version should be pinned? | Compare spec between releases if available | Pinned version decision |
 
@@ -107,9 +107,9 @@ Each item is a question with a defined test and a defined evidence artifact. Rec
 - Decision record complete.
 
 ### Failure conditions
-- No external way to send prompts into a *visible, attached* session → the topology must change (for example the mesh owns the sessions via the server and tabs only attach).
+- No external way to send prompts into a *visible, attached* session → the topology must change (for example AutoSlave owns the sessions via the server and tabs only attach).
 - No reliable completion signal → completion detection must be redesigned around message history plus a required structured completion report.
-- Structured output unreliable on the intended reviewer model → pick another reviewer model or add a validate-and-retry layer in the mesh.
+- Structured output unreliable on the intended reviewer model → pick another reviewer model or add a validate-and-retry layer in AutoSlave.
 - If the programmatic route is fundamentally insufficient, the project premise is in question. Stop and reassess; do **not** fall back to terminal scraping silently.
 
 ### Explicitly NOT built yet
@@ -126,7 +126,7 @@ The `spike/findings/` folder plus the signed-off decision record, reviewed by th
 Turn the spike into a small, typed, tested **adapter** and a minimal **Agent Registry**, so later phases never touch OpenCode directly.
 
 ### Why it exists
-Isolates all OpenCode-specific behavior in one module (keeping OpenCode replaceable), and gives the mesh a stable vocabulary: agents, roles, status.
+Isolates all OpenCode-specific behavior in one module (keeping OpenCode replaceable), and gives AutoSlave a stable vocabulary: agents, roles, status.
 
 ### Dependencies
 Phase 0 decision record.
@@ -160,10 +160,10 @@ Passing contract tests against the pinned OpenCode version, a recorded demo run 
 ## 5. Phase 2 — The MVP: Coder ↔ Reviewer loop
 
 ### Objective
-Prove the central thesis: **two real OpenCode sessions, one coder and one independent reviewer, collaborate through the mesh to reach an approved result, with no manual copy-paste.**
+Prove the central thesis: **two real OpenCode sessions, one coder and one independent reviewer, collaborate through AutoSlave to reach an approved result, with no manual copy-paste.**
 
 ### Why it exists
-This is the product's reason for being, and the first moment the mesh does something a pile of tabs cannot.
+This is the product's reason for being, and the first moment AutoSlave does something a pile of tabs cannot.
 
 ### Dependencies
 Phase 1 complete. Phase 0 answers for Q11, Q12, Q13, Q15, Q19.
@@ -182,7 +182,8 @@ Phase 1 complete. Phase 0 answers for Q11, Q12, Q13, Q15, Q19.
   ```
 - **Coder completion report** (structured): what was done, files changed, commands run, known gaps.
 - **Context packet builder:** objective, relevant plan excerpt, diff since last review, coder report, previous verdict. No raw transcript by default.
-- **Structured verdict** via `json_schema` output:
+- **Structured verdict** via instruction-following raw JSON (no `json_schema` facility in
+  v2 API — Phase 0 decision D4), validated in AutoSlave with retry-then-escalate:
   ```json
   {
     "status": "reject",
@@ -195,15 +196,15 @@ Phase 1 complete. Phase 0 answers for Q11, Q12, Q13, Q15, Q19.
 - **Automatic feedback routing:** a `reject` verdict becomes a `feedback.apply` message to the coder.
 - **Iteration limit** (configurable default, for example 5) and a **per-agent timeout**.
 - **State store** (a single local SQLite file or equivalent) and **append-only audit log** recording every message, transition and decision.
-- **CLI:** `mesh start`, `mesh agent add`, `mesh agent role`, `mesh run --task ... --plan ...`, `mesh status`, `mesh pause`, `mesh resume`, `mesh kill`, `mesh log`.
+- **CLI:** `autoslave start`, `autoslave agent add`, `autoslave agent role`, `autoslave run --task ... --plan ...`, `autoslave status`, `autoslave pause`, `autoslave resume`, `autoslave kill`, `autoslave log`.
 - **Single-writer rule:** only the coder writes; the reviewer works read-only by convention in the MVP (enforced properly in Phase 4).
 
 ### Success criteria
 A demonstration, repeatable, on a real small task with a real `plan.md`:
 
 1. User registers two sessions and runs the task.
-2. Coder works; mesh observes through the adapter.
-3. Mesh builds the context packet and the reviewer returns a schema-valid verdict.
+2. Coder works; autoslave observes through the adapter.
+3. AutoSlave builds the context packet and the reviewer returns a schema-valid verdict.
 4. On reject, the coder receives the `next_actions` automatically and fixes the project.
 5. The reviewer reassesses the updated result.
 6. The loop ends in `APPROVED`, or `ESCALATED` at the iteration limit.
@@ -241,7 +242,7 @@ Phase 2.
 - **Verification runner:** runs configured commands (for example test, build, lint, typecheck) in the target working directory; captures exit code, duration, and trimmed output.
 - **Verification config:** per-project list of checks and which are *required for approval*.
 - **Gate rule:** a workflow cannot enter `APPROVED` unless required checks pass, even if the reviewer approves. Failing results are attached to the next `feedback.apply`.
-- **Optional tester agent role:** an OpenCode session that writes or runs tests; its structured result joins the packet. (Mesh-run commands are enough for the first version; an agent tester is optional.)
+- **Optional tester agent role:** an OpenCode session that writes or runs tests; its structured result joins the packet. (AutoSlave-run commands are enough for the first version; an agent tester is optional.)
 - **Result summarization** into the context packet (failure excerpts, not full logs).
 
 ### Success criteria
@@ -257,14 +258,14 @@ Phase 2.
 Debugger agent, parallel test orchestration, coverage analytics, CI integration, UI.
 
 ### Evidence that Phase 3 is complete
-Recorded runs: (a) tests fail, reviewer approves, mesh blocks; (b) tests pass, reviewer rejects, mesh continues; (c) both pass, mesh approves.
+Recorded runs: (a) tests fail, reviewer approves, autoslave blocks; (b) tests pass, reviewer rejects, autoslave continues; (c) both pass, autoslave approves.
 
 ---
 
 ## 7. Phase 4 — Isolation and safety
 
 ### Objective
-Make the mesh safe to leave running: no uncontrolled writes, no self-granted permissions, no permanent stalls, and recoverable state.
+Make AutoSlave safe to leave running: no uncontrolled writes, no self-granted permissions, no permanent stalls, and recoverable state.
 
 ### Why it exists
 Once more than one agent can act, shared working trees, permissive tools and stuck processes become the main risk.
@@ -274,7 +275,7 @@ Phases 2–3; Phase 0 answers for Q14, Q16, Q17, Q18.
 
 ### What must be built
 - **Git worktree isolation:** each writing agent works in its own branch/worktree; reviewers read the author's worktree; approved changes are applied through a **controlled merge** step.
-- **Static permission policy:** a user-owned config mapping roles to capabilities (read, write, execute allowlist, paths). The mesh **answers permission requests from rules** (allow / deny / escalate-to-human); no model output counts as approval. OpenCode's own permission settings are configured to match, as a second layer.
+- **Static permission policy:** a user-owned config mapping roles to capabilities (read, write, execute allowlist, paths). AutoSlave **answers permission requests from rules** (allow / deny / escalate-to-human); no model output counts as approval. OpenCode's own permission settings are configured to match, as a second layer.
 - **Server hardening:** bind to localhost, enable the server password.
 - **Controls:** pause, resume, kill (agent and workflow), per-agent timeouts, per-task budgets (iterations, time, and cost where measurable).
 - **Crash recovery:** on daemon restart, reload state, reconcile each agent against its OpenCode session and message history, and resume or escalate. Handle a vanished session or server.
@@ -315,7 +316,7 @@ Phases 2–4.
 - **Agent graph config:** declarative edges (`from`, `to`, `on` event or condition, `payload` selection). Examples: "reviewer monitors coder"; "debugger activates only when tests fail".
 - **Workflow definitions** built from the graph, validated at load (no cycles without a cap, no orphaned roles).
 - **Debugger role** integration (diagnosis and proposed fix steps routed to the coder).
-- **Planner role** producing a plan and decomposition that the mesh parses from structured output.
+- **Planner role** producing a plan and decomposition that AutoSlave parses from structured output.
 
 ### Success criteria
 - A multi-task objective completes with dependencies respected.
@@ -337,10 +338,10 @@ Two different graph configs run on the same objective with different, correct be
 ## 9. Phase 6 — One-command autonomous workflow
 
 ### Objective
-`mesh run "Build this feature according to plan.md"` takes a requirement through planning, implementation, testing, review, debugging and approval.
+`autoslave run "Build this feature according to plan.md"` takes a requirement through planning, implementation, testing, review, debugging and approval.
 
 ### Why it exists
-It is the vision: the user supplies the objective; OpenCode remains the worker; the mesh is the manager.
+It is the vision: the user supplies the objective; OpenCode remains the worker; AutoSlave is the manager.
 
 ### Dependencies
 Phases 0–5, all gates passed.

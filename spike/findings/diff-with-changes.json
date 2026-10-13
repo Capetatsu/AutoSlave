@@ -1,0 +1,11 @@
+{
+ "data": [
+  {
+   "file": "spike/work/spike-note.txt",
+   "patch": "diff --git a/spike/work/spike-note.txt b/spike/work/spike-note.txt\nnew file mode 100644\nindex 0000000..d9605cb\n--- /dev/null\n+++ b/spike/work/spike-note.txt\n@@ -0,0 +1 @@\n+HELLO\n\\ No newline at end of file\n",
+   "additions": 1,
+   "deletions": 0,
+   "status": "added"
+  }
+ ]
+}

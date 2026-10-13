@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+const spec = JSON.parse(fs.readFileSync('spike/findings/openapi-2.0.28.json', 'utf8'));
+const S = spec.components.schemas;
+console.log('=== Location.PublicRef:');
+console.log(JSON.stringify(S['Location.PublicRef'], null, 1).slice(0, 800));
+console.log('=== tui paths:');
+console.log(Object.keys(spec.paths).filter((p) => p.includes('tui')));
+console.log('=== wait op full (body?):');
+console.log(JSON.stringify(spec.paths['/api/experimental/session/{sessionID}/wait']['post'].requestBody ?? 'NO BODY'));
+console.log('=== SessionMessagesResponse:');
+console.log(JSON.stringify(S['SessionMessagesResponse'], null, 1).slice(0, 1200));
+console.log('=== session.active 200:');
+console.log(JSON.stringify(spec.paths['/api/session/active']['get'].responses['200'], null, 1).slice(0, 600));

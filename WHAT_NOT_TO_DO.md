@@ -1,4 +1,4 @@
-# OpenCode Mesh — WHAT NOT TO DO
+# AutoSlave — WHAT NOT TO DO
 
 > **Purpose of this document:** strict guardrails against scope creep and bad engineering. Consult it whenever a new feature, shortcut or dependency is proposed. **If a proposal violates a rule here, reject or postpone it.**
 >
@@ -28,12 +28,12 @@ Each rule has: the rule, why it exists, what to do instead.
 - **Instead:** Let OpenCode be the coding environment. Expose coordination through the CLI.
 
 ### P2. Do NOT replace OpenCode or reimplement its coding functionality
-- **Why:** Tool execution, file editing, model calls and context management are OpenCode's job. Reimplementing them splits effort and makes the mesh a competing agent.
-- **Instead:** Drive OpenCode through its programmatic interface. If OpenCode lacks something, record it as a limitation or contribute upstream; do not build around it inside the mesh.
+- **Why:** Tool execution, file editing, model calls and context management are OpenCode's job. Reimplementing them splits effort and makes AutoSlave a competing agent.
+- **Instead:** Drive OpenCode through its programmatic interface. If OpenCode lacks something, record it as a limitation or contribute upstream; do not build around it inside AutoSlave.
 
 ### P3. Do NOT create another coding agent
-- **Why:** The mesh must never write code or call a model to "do the work". The moment it does, it stops being a coordinator and its verdicts lose independence.
-- **Instead:** All code is written by OpenCode agents. The mesh only routes, sequences, validates and records.
+- **Why:** AutoSlave must never write code or call a model to "do the work". The moment it does, it stops being a coordinator and its verdicts lose independence.
+- **Instead:** All code is written by OpenCode agents. AutoSlave only routes, sequences, validates and records.
 
 ### P4. Do NOT build a custom TUI or any graphical UI initially
 - **Why:** The terminal tabs are already the visible representation. A custom interface consumes time that should go to proving the communication loop.
@@ -41,7 +41,7 @@ Each rule has: the rule, why it exists, what to do instead.
 
 ### P5. Do NOT spend time on branding, visual polish, dashboards or visual features before orchestration works
 - **Why:** None of it affects whether agents communicate reliably.
-- **Instead:** Plain text output. Make `mesh status` and `mesh log` clear and complete; nothing more.
+- **Instead:** Plain text output. Make `autoslave status` and `autoslave log` clear and complete; nothing more.
 
 ### P6. Do NOT scrape terminal text, screenshots or pixels when OpenCode provides a programmatic interface
 - **Why:** Scraping is brittle, version-dependent, hard to test, and cannot reliably distinguish agent output from UI chrome. The whole premise is that tabs are only the visible face of sessions.
@@ -53,7 +53,7 @@ Each rule has: the rule, why it exists, what to do instead.
 
 ### P8. Do NOT treat multiple copies of the same model as independent verification
 - **Why:** Identical models share the same failure modes, blind spots and biases. Five identical reviewers agreeing is one opinion repeated.
-- **Instead:** Prefer different models/providers for author and judge, and always combine review with deterministic checks. Surface "same model on both sides" as a warning in `mesh status`.
+- **Instead:** Prefer different models/providers for author and judge, and always combine review with deterministic checks. Surface "same model on both sides" as a warning in `autoslave status`.
 
 ### P9. Do NOT equate agent consensus with correctness
 - **Why:** Agreement indicates similarity, not truth. Agents can confidently agree on wrong answers.
@@ -61,7 +61,7 @@ Each rule has: the rule, why it exists, what to do instead.
 
 ### P10. Do NOT let an LLM approve its own permissions
 - **Why:** A model granting itself capabilities defeats the purpose of permissions, and prompt injection could exploit it.
-- **Instead:** Permissions are static, explicit, auditable rules enforced by the mesh (and mirrored in OpenCode's own configuration as a second layer). Permission requests are answered from rules: allow, deny or escalate to the human.
+- **Instead:** Permissions are static, explicit, auditable rules enforced by AutoSlave (and mirrored in OpenCode's own configuration as a second layer). Permission requests are answered from rules: allow, deny or escalate to the human.
 
 ### P11. Do NOT allow uncontrolled simultaneous writes to a shared working tree
 - **Why:** Concurrent edits cause lost work, corrupt state and unreproducible failures, and make diffs unattributable.
@@ -77,7 +77,7 @@ Each rule has: the rule, why it exists, what to do instead.
 
 ### P14. Do NOT use free-form prose as the sole mechanism for machine workflow decisions when structured output is available
 - **Why:** Prose is inconsistent. Interpreting "mostly fine, perhaps tweak the expiry logic" invites silent mistakes in routing.
-- **Instead:** Require schema-validated output (verdicts, completion reports, tester and debugger results). Validate in the mesh as well. On invalid output, retry once, then escalate. Never guess from prose.
+- **Instead:** Require schema-validated output (verdicts, completion reports, tester and debugger results). Validate in AutoSlave as well. On invalid output, retry once, then escalate. Never guess from prose.
 
 ---
 
@@ -92,7 +92,7 @@ Each rule has: the rule, why it exists, what to do instead.
 | T5 | **Forwarding unlimited conversation histories** between agents | Cost, noise, bias, leaked secrets, unreproducible behavior | Build bounded context packets (objective, plan excerpt, diff, results, previous verdict) |
 | T6 | **Unbounded review loops** | Oscillation or non-convergence burns cost and time forever | Iteration cap, per-agent timeouts, task budgets, early escalation when issues repeat with no diff change |
 | T7 | **Treating "idle" as proof of success** | An idle agent may be blocked on a permission prompt, errored, aborted, or have given up | Completion = idle signal **plus** history confirmation **plus** a valid completion report; then verify with the reviewer and checks |
-| T8 | **Letting models set their own permissions** | See P10 | Static policy enforced by the mesh |
+| T8 | **Letting models set their own permissions** | See P10 | Static policy enforced by AutoSlave |
 | T9 | **Multiple agents editing one working tree** | See P11 | One writer in MVP; worktrees later |
 | T10 | **Believing the author's report instead of the diff** | A completion report is a claim | Reviewer and checks inspect the real changes |
 | T11 | **Mutable-only state with no audit log** | Cannot explain or reproduce decisions; cannot debug loops | Append-only audit log of every message, transition and decision, with cause |
@@ -140,8 +140,8 @@ Answer every item for each proposal. **All "must" items must pass.**
 - [ ] Is there a smaller version that proves the same thing?
 
 **Identity**
-- [ ] (must) Does it avoid making the mesh an IDE, a coding agent, an OpenCode replacement, or a UI project?
-- [ ] (must) Does it keep OpenCode as the worker and the mesh as the coordinator?
+- [ ] (must) Does it avoid making AutoSlave an IDE, a coding agent, an OpenCode replacement, or a UI project?
+- [ ] (must) Does it keep OpenCode as the worker and AutoSlave as the coordinator?
 
 **Interface and correctness**
 - [ ] (must) Does it use OpenCode's programmatic interface rather than scraping?

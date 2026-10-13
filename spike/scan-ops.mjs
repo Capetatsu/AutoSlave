@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+const spec = JSON.parse(fs.readFileSync('spike/findings/openapi-2.0.28.json', 'utf8'));
+const S = spec.components.schemas;
+const showOp = (p, m) => {
+  console.log('=== ' + m.toUpperCase() + ' ' + p);
+  console.log(JSON.stringify(spec.paths[p]?.[m], null, 1).slice(0, 2500));
+  console.log();
+};
+showOp('/api/session/{sessionID}/message', 'get');
+showOp('/api/experimental/session/{sessionID}/wait', 'post');
+showOp('/api/session/{sessionID}/background', 'post');
+showOp('/api/session/active', 'get');
+console.log('=== Session.Create location/model part:');
+const createBody = spec.paths['/api/session']['post'].requestBody.content['application/json'].schema;
+console.log(JSON.stringify(createBody.properties.location, null, 1));
+console.log(JSON.stringify(createBody.properties.model, null, 1));
+console.log('=== Model.Ref:');
+console.log(JSON.stringify(S['Model.Ref'], null, 1));
+console.log('=== Permission.Ruleset:');
+console.log(JSON.stringify(S['Permission.Ruleset'], null, 1).slice(0, 1500));

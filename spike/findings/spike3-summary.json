@@ -1,0 +1,47 @@
+{
+ "at": "2026-10-13T19:14:59.286Z",
+ "out": {
+  "modelsAfterSwitch": [
+   {
+    "id": "mimo-v2.6-flash-free",
+    "providerID": "opencode",
+    "variant": "default"
+   },
+   {
+    "id": "mimo-v2.6-flash-free",
+    "providerID": "opencode",
+    "variant": "default"
+   },
+   {
+    "id": "mimo-v2.6-flash-free",
+    "providerID": "opencode",
+    "variant": "default"
+   }
+  ],
+  "diffShape": [
+   "file",
+   "patch",
+   "additions",
+   "deletions",
+   "status"
+  ],
+  "verdict": {
+   "parsed": true,
+   "err": null,
+   "status": "reject",
+   "issues": 1,
+   "nextActions": 3,
+   "schemaValid": true
+  },
+  "live": {
+   "framesBeforeKill": 9,
+   "framesAfterReconnect": 25,
+   "terminalA_beforeKill": 0,
+   "terminalA_afterReconnect": 1,
+   "terminalB_afterReconnect": 1,
+   "textA": "CONC-A",
+   "textB": "CONC-B"
+  },
+  "concSession": "ses_ec94f9ab2ffeWhgWah6KH0Mh47"
+ }
+}

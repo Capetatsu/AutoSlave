@@ -1,0 +1,102 @@
+{
+ "server": "http://127.0.0.1:49374",
+ "at": "2026-10-13T19:10:18.700Z",
+ "summary": {
+  "listBefore": {
+   "status": 200,
+   "count": 19
+  },
+  "createCoder": {
+   "status": 200,
+   "id": "ses_ec954ec63ffeFqqj8MjfgbCNvR",
+   "location": {
+    "directory": "D:\\Things\\Work\\Projects\\Agent-Mesh\\spike\\work"
+   }
+  },
+  "promptCoder": {
+   "status": 200,
+   "returnMs": 637,
+   "inboxId": "msg_136ab15190013hzl6O4viEf57r",
+   "delivery": "steer"
+  },
+  "waitCoder": {
+   "status": 204,
+   "waitedMs": 290
+  },
+  "historyCoder": {
+   "status": 200,
+   "count": 3,
+   "types": [
+    "user",
+    "assistant",
+    "idle"
+   ],
+   "assistantPreview": []
+  },
+  "eventsA": {
+   "count": 15,
+   "types": {
+    "message:session.inbox.enqueued": 1,
+    "message:session.execution.started": 1,
+    "message:session.instructions.updated": 1,
+    "message:session.inbox.delivered": 1,
+    "message:session.step.started": 1,
+    "message:session.reasoning.started": 1,
+    "message:session.reasoning.delta": 1,
+    "message:session.text.started": 1,
+    "message:session.reasoning.ended": 1,
+    "message:session.text.delta": 1,
+    "message:session.text.ended": 1,
+    "message:session.step.streamed": 1,
+    "message:session.step.ended": 1,
+    "message:session.usage.updated": 1,
+    "message:session.execution.succeeded": 1
+   }
+  },
+  "eventsB": {
+   "count": 11
+  },
+  "promptReviewer": {
+   "status": 200,
+   "returnMs": 7
+  },
+  "verdict": {
+   "parsed": false,
+   "valid": false,
+   "error": "Unexpected end of JSON input | raw head: ",
+   "rawHead": ""
+  },
+  "interrupt": {
+   "status": 200,
+   "ms": 17,
+   "body": {
+    "interrupted": false
+   }
+  },
+  "afterInterrupt": [
+   {
+    "type": "idle"
+   },
+   {
+    "type": "assistant"
+   },
+   {
+    "type": "user"
+   },
+   {
+    "type": "idle"
+   },
+   {
+    "type": "assistant"
+   }
+  ],
+  "diff": {
+   "status": 200,
+   "keys": []
+  },
+  "cliList": {
+   "coderVisible": false,
+   "reviewerVisible": false
+  }
+ }
+}

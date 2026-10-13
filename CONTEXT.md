@@ -1,4 +1,4 @@
-# OpenCode Mesh — CONTEXT
+# AutoSlave — CONTEXT
 
 > **Purpose of this document:** explain *what* the project is and *why* it exists, for a reader who has never heard of it. Read this first. It defines the vocabulary used by every other document.
 >
@@ -8,7 +8,7 @@
 
 ## 1. One-paragraph summary
 
-OpenCode Mesh is a **local orchestration layer that connects independent OpenCode agent sessions into a coordinated multi-agent engineering team**. It lets those sessions exchange context, review each other's work, assign follow-up actions, react to failures, and iterate toward a shared goal, without the human manually carrying messages between terminal tabs. OpenCode remains the coding environment and agent runtime. The mesh is the **manager above it**.
+AutoSlave is a **local orchestration layer that connects independent OpenCode agent sessions into a coordinated multi-agent engineering team**. It lets those sessions exchange context, review each other's work, assign follow-up actions, react to failures, and iterate toward a shared goal, without the human manually carrying messages between terminal tabs. OpenCode remains the coding environment and agent runtime. AutoSlave is the **manager above it**.
 
 The central claim of the project, which every other decision must serve:
 
@@ -71,9 +71,9 @@ This boundary is stated in one place here and enforced in `WHAT_NOT_TO_DO.md`.
 |---|---|
 | A new IDE | No editor, no file tree, no code views. |
 | A replacement for OpenCode | OpenCode does all the coding, tool use and model interaction. |
-| A new coding agent | The mesh never writes code itself and never calls a model to "do the work". |
+| A new coding agent | AutoSlave never writes code itself and never calls a model to "do the work". |
 | A custom TUI (initially) | The CLI is a thin control surface. No custom interface in the early project. |
-| A terminal scraper | The mesh must not depend on reading terminal text or pixels. |
+| A terminal scraper | AutoSlave must not depend on reading terminal text or pixels. |
 | An "AI software company" (initially) | The one-command autonomous workflow is the destination, not the starting point. |
 
 ---
@@ -84,27 +84,27 @@ This boundary is stated in one place here and enforced in `WHAT_NOT_TO_DO.md`.
 
 - **Window 1 = Coder.** An OpenCode session told: "Implement the authentication system according to `plan.md`."
 - **Window 2 = Reviewer / monitor.** A separate OpenCode session, ideally on a different model or provider, whose job is to judge Window 1's work.
-- **The mesh.** A local daemon that sits between them.
+- **AutoSlave.** A local daemon that sits between them.
 
 ### 4.2 What happens
 
-1. The user gives the mesh an objective and a plan (`plan.md`).
-2. The mesh sends the task to Window 1 and **observes Window 1 programmatically** through OpenCode's interface (events, status, message history), not by reading the screen.
+1. The user gives AutoSlave an objective and a plan (`plan.md`).
+2. AutoSlave sends the task to Window 1 and **observes Window 1 programmatically** through OpenCode's interface (events, status, message history), not by reading the screen.
 3. Window 1 reaches a meaningful stopping point and reports what it did.
-4. The mesh builds a **context packet** for Window 2: the objective, the relevant part of the plan, the diff, the coder's report, and any test results.
+4. AutoSlave builds a **context packet** for Window 2: the objective, the relevant part of the plan, the diff, the coder's report, and any test results.
 5. Window 2 **independently analyses** the work against the plan: is it correct, complete, safe? It inspects the actual code and may run permitted checks.
 6. Window 2 returns a **structured verdict**.
    - Approve: `{ "status": "approve", ... }`
    - Reject: `{ "status": "reject", "issues": [...], "next_actions": [...] }`
-7. On **reject**, the mesh automatically delivers the precise `next_actions` to Window 1. Window 1 changes the project and reports again.
-8. The mesh sends the updated result to Window 2 for reassessment.
+7. On **reject**, AutoSlave automatically delivers the precise `next_actions` to Window 1. Window 1 changes the project and reports again.
+8. AutoSlave sends the updated result to Window 2 for reassessment.
 9. The loop ends on **approval**, or stops and **escalates to the human** when an iteration limit is reached.
 
 At no point does the user copy and paste between windows.
 
 ### 4.3 Why the verdict must be structured
 
-If the reviewer replies in free prose ("looks mostly fine, maybe check the expiry logic?"), the mesh must guess what to do. A structured verdict lets the mesh make a reliable decision: approve means stop; reject means route `next_actions` to the coder. The mesh decides from fields, not from interpreting tone.
+If the reviewer replies in free prose ("looks mostly fine, maybe check the expiry logic?"), AutoSlave must guess what to do. A structured verdict lets AutoSlave make a reliable decision: approve means stop; reject means route `next_actions` to the coder. AutoSlave decides from fields, not from interpreting tone.
 
 ---
 
@@ -112,10 +112,10 @@ If the reviewer replies in free prose ("looks mostly fine, maybe check the expir
 
 Collaboration requires **communication plus coordination**:
 
-| Property | Multiple tabs | Mesh |
+| Property | Multiple tabs | AutoSlave |
 |---|---|---|
 | Agents know others exist | No | Yes |
-| Work product flows between agents | Only by human copy-paste | Automatic, via the mesh |
+| Work product flows between agents | Only by human copy-paste | Automatic, via AutoSlave |
 | Someone decides who acts next | The human | The workflow engine |
 | Feedback reaches the author | Only if the human relays it | Automatic |
 | Completion has a definition | The human's judgement | Approval plus deterministic checks |
@@ -125,16 +125,16 @@ Concurrency alone is not the goal. Five agents running at once with nobody conne
 
 ### 5.1 What makes this different from "just running multiple agents in parallel"
 
-- **Parallel agents** split work and never talk. **The mesh** makes agents *depend on each other's output*: the reviewer's input is the coder's result; the coder's next step is the reviewer's verdict.
-- **Parallel agents** have no shared notion of "done". **The mesh** defines done as independent review **and** deterministic checks.
-- **Parallel agents** can clobber each other's files. **The mesh** treats shared-state safety as a design concern (isolation, one writer at a time).
-- **Parallel agents** are unauditable. **The mesh** logs every message and decision with its cause.
+- **Parallel agents** split work and never talk. **AutoSlave** makes agents *depend on each other's output*: the reviewer's input is the coder's result; the coder's next step is the reviewer's verdict.
+- **Parallel agents** have no shared notion of "done". **AutoSlave** defines done as independent review **and** deterministic checks.
+- **Parallel agents** can clobber each other's files. **AutoSlave** treats shared-state safety as a design concern (isolation, one writer at a time).
+- **Parallel agents** are unauditable. **AutoSlave** logs every message and decision with its cause.
 
 ---
 
 ## 6. Product philosophy
 
-1. **OpenCode stays the worker.** The mesh adds coordination, not coding capability.
+1. **OpenCode stays the worker.** AutoSlave adds coordination, not coding capability.
 2. **Communication plus orchestration is the product.** Not window count, not UI.
 3. **Programmatic interfaces only.** If OpenCode offers an official or stable interface, use it. Never scrape.
 4. **Structured over prose.** Machine decisions come from structured fields wherever possible.
@@ -153,7 +153,7 @@ Concurrency alone is not the goal. Five agents running at once with nobody conne
 Eventually a single command starts an entire engineering process:
 
 ```
-mesh run "Build this feature according to plan.md"
+autoslave run "Build this feature according to plan.md"
 ```
 
 A **planner/architect** turns the requirement into a plan and task graph. A **coder** implements. A **tester** runs deterministic checks. A **reviewer** independently judges. Failures go to a **debugger**, fixes go back to the coder, and the cycle repeats until deterministic checks and independent review agree the work is complete. Users can define **agent graphs**: which agents connect to which, and what flows along each connection.
@@ -176,28 +176,28 @@ These terms are used consistently across all four documents.
 
 | Term | Definition |
 |---|---|
-| **OpenCode session** | One running OpenCode conversation with its own context, model and working directory. The unit the mesh talks to. A terminal tab is merely a view onto it. |
-| **Agent** | An OpenCode session *as seen by the mesh*: a session plus an identity, a role, a working directory and a health status. |
+| **OpenCode session** | One running OpenCode conversation with its own context, model and working directory. The unit AutoSlave talks to. A terminal tab is merely a view onto it. |
+| **Agent** | An OpenCode session *as seen by AutoSlave*: a session plus an identity, a role, a working directory and a health status. |
 | **Role** | The job an agent is assigned: coder, reviewer, tester, debugger, planner, architect, researcher. Roles carry responsibilities and (later) permissions. |
-| **Mesh** | The whole system: the daemon, its components, and the CLI that controls it. |
-| **Daemon** | The long-running local process at the centre of the mesh. It holds state, talks to OpenCode, runs workflows. |
+| **AutoSlave** | The whole system: the daemon, its components, and the CLI that controls it. |
+| **Daemon** | The long-running local process at the centre of AutoSlave. It holds state, talks to OpenCode, runs workflows. |
 | **CLI** | The thin command-line control surface for the daemon (start, register, assign, send, status, pause, resume, kill). Not a TUI. |
 | **Adapter** | The only code that knows OpenCode's interface. Translates agent-neutral operations (send task, subscribe, fetch history, abort) into OpenCode calls. Makes OpenCode replaceable later. |
-| **Agent Registry** | The mesh's record of which agents exist, their roles, and their status. |
+| **Agent Registry** | AutoSlave's record of which agents exist, their roles, and their status. |
 | **Message bus** | The component that carries typed messages between agents and the workflow engine. Messages are persisted before delivery. |
 | **Task** | A unit of work with an objective, status and an assigned agent. In the MVP there is one task. Later, tasks form a graph. |
 | **Task graph** | Tasks with dependencies (Future). |
 | **Workflow** | The state machine that decides who acts next for a task (for example CODING → REVIEWING → FIXING → REVIEWING → APPROVED). |
-| **Orchestration** | The act of assigning work, routing information, and sequencing agents. The mesh's job. |
+| **Orchestration** | The act of assigning work, routing information, and sequencing agents. AutoSlave's job. |
 | **Review loop** | The repeating cycle Coder → Reviewer → Coder → Reviewer until approval or the iteration limit. |
 | **Verdict** | The reviewer's structured judgement: `approve` or `reject` with issues and next actions. |
-| **Context packet** | The bounded bundle of information the mesh sends to an agent: objective, plan excerpt, diff, results, prior verdict. Not a raw transcript. |
+| **Context packet** | The bounded bundle of information AutoSlave sends to an agent: objective, plan excerpt, diff, results, prior verdict. Not a raw transcript. |
 | **Structured output** | Machine-parseable agent output validated against a schema (for example a JSON Schema verdict). |
 | **Deterministic verification** | Objective checks with reproducible results: unit tests, build, linter, type checker. A source of truth independent of any model. |
 | **Agent graph** | A user-defined map of which agents are connected and what information flows along each connection (Future). |
 | **State store** | Durable storage of task, agent and workflow state, enabling recovery. |
 | **Audit log** | Append-only record of what happened and why. Distinct from mutable state. |
-| **Escalation** | Handing control back to the human when the mesh cannot or should not proceed (iteration limit, repeated failure, policy block). |
+| **Escalation** | Handing control back to the human when AutoSlave cannot or should not proceed (iteration limit, repeated failure, policy block). |
 
 ### 8.1 Mental model in one picture
 
@@ -205,7 +205,7 @@ These terms are used consistently across all four documents.
             you (objective, plan, final say)
                          │  CLI
                          ▼
-   ┌─────────────────── MESH (daemon) ───────────────────┐
+    ┌──────────────── AUTOSLAVE (daemon) ────────────────┐
    │ Registry · Message bus · Workflow engine · State    │
    │ Audit log · (later) Policy engine, Task graph       │
    │                    ┌──────────┐                     │

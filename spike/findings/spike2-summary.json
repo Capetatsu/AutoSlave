@@ -1,0 +1,36 @@
+{
+ "at": "2026-10-13T19:13:00.992Z",
+ "out": {
+  "waitRetest": {
+   "waitStatus": 204,
+   "waitMs": 1615,
+   "execMs": null
+  },
+  "modelSwitch": {
+   "status": 204,
+   "body": null
+  },
+  "toolUse": {
+   "terminal": "session.execution.succeeded",
+   "permissionEvents": [],
+   "fileCreated": true
+  },
+  "abort": {
+   "interrupt": {
+    "interrupted": true
+   },
+   "latest": [
+    {
+     "type": "idle",
+     "outcome": "interrupted"
+    },
+    {
+     "type": "assistant"
+    },
+    {
+     "type": "user"
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+const raw = fs.readFileSync('spike/findings/openapi-2.0.28.json', 'utf8');
+const spec = JSON.parse(raw);
+const hits = new Set();
+const re = /"(session\.[a-z0-9.]+|message\.[a-z.]+|permission\.[a-z.]+|tui\.[a-z.]+)"/g;
+let m;
+while ((m = re.exec(raw)) && hits.size < 100) hits.add(m[1]);
+console.log([...hits].sort().join('\n'));
+console.log('=== event.subscribe op:');
+console.log(JSON.stringify(spec.paths['/api/event']['get'], null, 1).slice(0, 1500));

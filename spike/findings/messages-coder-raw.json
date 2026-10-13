@@ -1,0 +1,130 @@
+[
+ {
+  "id": "msg_136ab15190013hzl6O4viEf57r",
+  "time": {
+   "created": 1791918544616
+  },
+  "text": "Reply with exactly the single token SPIKE-OK and nothing else. Do not call any tools.",
+  "type": "user"
+ },
+ {
+  "id": "msg_136ab16f0001YJmIYXiXBSCKEk",
+  "time": {
+   "created": 1791918544633,
+   "streamed": 1791918546820,
+   "completed": 1791918546886
+  },
+  "type": "assistant",
+  "agent": "build",
+  "model": {
+   "id": "cat-jam-free",
+   "providerID": "opencode"
+  },
+  "content": [
+   {
+    "type": "reasoning",
+    "text": "The user wants me to reply with exactly \"SPIKE-OK\" and nothing else. No tools. Simple.",
+    "state": {
+     "reasoningField": "reasoning_content"
+    },
+    "time": {
+     "created": 1791918546732,
+     "completed": 1791918546813
+    }
+   },
+   {
+    "type": "text",
+    "text": "SPIKE-OK"
+   }
+  ],
+  "snapshot": {
+   "start": "f0690a14c32d817a56c1cf50f1f73f0fc0978c98",
+   "end": "f0690a14c32d817a56c1cf50f1f73f0fc0978c98",
+   "files": []
+  },
+  "finish": "stop",
+  "rawFinish": "stop",
+  "cost": 0,
+  "tokens": {
+   "input": 2937,
+   "output": 5,
+   "reasoning": 32,
+   "cache": {
+    "read": 1984,
+    "write": 0
+   }
+  }
+ },
+ {
+  "id": "msg_136ab1fc9001qz2wSB9kjhjJ1B",
+  "time": {
+   "created": 1791918546889
+  },
+  "type": "idle",
+  "outcome": "succeeded"
+ },
+ {
+  "id": "msg_136ac1517001tcCDV2MeGaK8nA",
+  "time": {
+   "created": 1791918609712
+  },
+  "text": "Count slowly from 1 to 30, one number per line. Do not call any tools.",
+  "type": "user"
+ },
+ {
+  "id": "msg_136ac1540001Clm6cnMcRSbY5e",
+  "time": {
+   "created": 1791918609747,
+   "streamed": 1791918611375,
+   "completed": 1791918611447
+  },
+  "type": "assistant",
+  "agent": "build",
+  "model": {
+   "id": "cat-jam-free",
+   "providerID": "opencode"
+  },
+  "content": [
+   {
+    "type": "reasoning",
+    "text": "The user wants me to count slowly from 1 to 30, one number per line. No tools. Just output the numbers.",
+    "state": {
+     "reasoningField": "reasoning_content"
+    },
+    "time": {
+     "created": 1791918611238,
+     "completed": 1791918611371
+    }
+   },
+   {
+    "type": "text",
+    "text": "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30"
+   }
+  ],
+  "snapshot": {
+   "start": "f0690a14c32d817a56c1cf50f1f73f0fc0978c98",
+   "end": "f0690a14c32d817a56c1cf50f1f73f0fc0978c98",
+   "files": []
+  },
+  "finish": "stop",
+  "rawFinish": "stop",
+  "cost": 0,
+  "tokens": {
+   "input": 121,
+   "output": 82,
+   "reasoning": 36,
+   "cache": {
+    "read": 4864,
+    "write": 0
+   }
+  }
+ },
+ {
+  "id": "msg_136ac1bfe001QtmfkKlrqhbhVd",
+  "time": {
+   "created": 1791918611454
+  },
+  "type": "idle",
+  "outcome": "succeeded"
+ }
+]
