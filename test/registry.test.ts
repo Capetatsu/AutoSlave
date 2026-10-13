@@ -31,13 +31,17 @@ describe('AgentRegistry', () => {
     assert.equal(r2.get(a.id)?.sessionId, 'ses_9');
   });
 
-  it('sets role and status', () => {
+  it('sets role, status, and model', () => {
     const r = reg();
     const a = r.add({ role: 'coder', sessionId: 'ses_1', serverUrl: 'http://x', workdir: '/w' });
     r.setRole(a.id, 'reviewer');
     r.setStatus(a.id, 'working');
+    r.setModel(a.id, 'opencode/mimo-v2.6-flash-free');
     assert.equal(r.get(a.id)?.role, 'reviewer');
     assert.equal(r.get(a.id)?.status, 'working');
+    assert.equal(r.get(a.id)?.model, 'opencode/mimo-v2.6-flash-free');
+    // model persists across instances
+    assert.equal(reg().get(a.id)?.model, 'opencode/mimo-v2.6-flash-free');
   });
 
   it('finds by session and removes', () => {

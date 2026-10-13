@@ -13,11 +13,16 @@ import { WorkflowEngine } from '../workflow/engine.js';
 import { readFileSync } from 'node:fs';
 
 function version(): string {
-  try {
-    return JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version as string;
-  } catch {
-    return '0.0.0';
+  // Works both from src/cli (../../package.json) and dist/src/cli (../../../package.json).
+  for (const rel of ['../../package.json', '../../../package.json']) {
+    try {
+      const p = JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8')) as { name?: string; version?: string };
+      if (p.name === 'autoslave' && p.version) return p.version;
+    } catch {
+      /* try next candidate */
+    }
   }
+  return '0.0.0';
 }
 
 function help(): string {
@@ -130,7 +135,7 @@ export async function main(argv: string[]): Promise<number> {
     registry.setStatus(rec.id, 'working');
     console.log(`sent inbox=${receipt.id} delivery=${receipt.delivery}`);
     if (waitIdx >= 0) {
-      const timeout = Number(flag(rest, '--timeout') ?? 180000);
+      const timeout = Number(flag(argv, '--timeout') ?? 180000);
       try {
         const turn = await adapter.waitForTurn(rec.sessionId, since, timeout);
         registry.setStatus(rec.id, 'idle');
@@ -146,7 +151,7 @@ export async function main(argv: string[]): Promise<number> {
 
   if (cmd === 'status') {
     const store = new StateStore();
-    const taskFlag = flag(rest, '--task') ?? (sub && sub.startsWith('task_') ? sub : undefined);
+    const taskFlag = flag(argv, '--task') ?? (sub && sub.startsWith('task_') ? sub : undefined);
     if (!taskFlag && !sub) {
       const tasks = store.listTasks();
       if (tasks.length === 0) console.log('no tasks yet — run `autoslave run --task ...`');
@@ -193,8 +198,8 @@ export async function main(argv: string[]): Promise<number> {
 
   if (cmd === 'log') {
     const store = new StateStore();
-    const lines = Number(flag(rest, '--lines') ?? 50);
-    const taskFlag = flag(rest, '--task');
+    const lines = Number(flag(argv, '--lines') ?? 50);
+    const taskFlag = flag(argv, '--task');
     const print = (): void => {
       for (const row of store.readAudit(taskFlag, lines)) {
         console.log(`${row.seq} ${row.ts} ${row.task} ${row.agent} ${row.kind} ${String(row.detail).slice(0, 220)}`);

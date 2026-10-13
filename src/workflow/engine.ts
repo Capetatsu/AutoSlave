@@ -231,7 +231,7 @@ export class WorkflowEngine {
     if (turn.model) {
       const rec = this.deps.registry.get(task.coderAgentId);
       if (rec && !rec.model) {
-        rec.model = `${turn.model.providerID}/${turn.model.id}`;
+        this.deps.registry.setModel(task.coderAgentId, `${turn.model.providerID}/${turn.model.id}`);
       }
     }
     const diff = await this.deps.adapter.getDiff(coderSession);
@@ -329,6 +329,12 @@ export class WorkflowEngine {
       return null;
     }
     this.deps.registry.setStatus(task.reviewerAgentId, 'idle');
+    if (turn.model) {
+      const rec = this.deps.registry.get(task.reviewerAgentId);
+      if (rec && !rec.model) {
+        this.deps.registry.setModel(task.reviewerAgentId, `${turn.model.providerID}/${turn.model.id}`);
+      }
+    }
 
     // Reviewer-write detection (D7): the reviewer must not modify the project.
     const diffAfter = (await this.deps.adapter.getDiff(reviewerSession)).length;

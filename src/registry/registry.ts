@@ -92,6 +92,14 @@ export class AgentRegistry {
     return rec;
   }
 
+  setModel(id: string, model: string): AgentRecord {
+    const rec = this.mustGet(id);
+    rec.model = model;
+    rec.updatedAt = new Date().toISOString();
+    this.save();
+    return rec;
+  }
+
   remove(id: string): boolean {
     const ok = this.agents.delete(id);
     if (ok) this.save();

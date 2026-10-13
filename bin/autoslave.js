@@ -3,7 +3,7 @@
 // (Full CLI arrives in Phase 2; this stub exists so the `autoslave`
 // executable name is verified on this machine from day one.)
 import { readFileSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const args = process.argv.slice(2);
@@ -24,7 +24,8 @@ if (args.includes('--version') || args.includes('-v')) {
 
 const built = path.join(root, 'dist', 'src', 'cli', 'index.js');
 if (existsSync(built)) {
-  await import(built);
+  // Cross-platform: dynamic import needs a file URL, not a Windows path.
+  await import(pathToFileURL(built).href);
 } else {
   console.error('autoslave: daemon CLI not built yet (Phase 2). Run `npm run build` once src/cli exists.');
   console.error(`autoslave ${pkgVersion()} — see CONTEXT.md for the project roadmap.`);
