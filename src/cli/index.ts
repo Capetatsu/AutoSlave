@@ -10,6 +10,7 @@ import type { AgentRole } from '../registry/registry.js';
 import { discoverConnection } from '../adapter/client.js';
 import { StateStore, autoslaveHome } from '../store/store.js';
 import { WorkflowEngine } from '../workflow/engine.js';
+import { loadChecks, parseCheckFlag, resolveChecks } from '../verify/checks.js';
 import { readFileSync } from 'node:fs';
 
 function version(): string {
@@ -37,6 +38,8 @@ Usage:
   autoslave run --task "<objective>" [--plan <file>] --coder <agentId> --reviewer <agentId>
                   [--max-iterations <n>] [--coder-timeout <ms>] [--reviewer-timeout <ms>]
                   [--reviewer-model <provider/model>] [--review-file <path>]
+                  [--check "name=command"] [--optional-check "name=command"]
+                  (plus autoslave.checks.json in the coder workdir)
   autoslave status <agentId> | --task <taskId> | (lists tasks)
   autoslave log [--task <taskId>] [--lines <n>] [--follow]
   autoslave pause <taskId> | autoslave resume <taskId> | autoslave kill <taskId>
@@ -178,6 +181,11 @@ export async function main(argv: string[]): Promise<number> {
       if (t.lastReport) {
         console.log(`  last report: ${t.lastReport.status} — ${t.lastReport.summary.slice(0, 160)}`);
       }
+      if (t.lastChecks && t.lastChecks.length > 0) {
+        for (const c of t.lastChecks) {
+          console.log(`  check ${c.name}: ${c.status} (exit ${c.exitCode ?? 'n/a'}, ${c.durationMs}ms)${c.required ? '' : ' [optional]'}`);
+        }
+      }
       if (t.reason) console.log(`  reason: ${t.reason}`);
       if (coder?.model && reviewer?.model && coder.model === reviewer.model) {
         console.log(`  warning: coder and reviewer use the same model (${coder.model}) — not independent verification`);
@@ -307,6 +315,26 @@ export async function main(argv: string[]): Promise<number> {
     for (let i = 0; i < argv.length; i++) {
       if (argv[i] === '--review-file' && argv[i + 1]) reviewFiles.push(argv[i + 1]);
     }
+    // Verification: per-project config file plus CLI overrides (CLI wins).
+    let configured: ReturnType<typeof loadChecks> = [];
+    try {
+      configured = loadChecks(coder.workdir);
+    } catch (e) {
+      console.error(`invalid checks config: ${(e as Error).message}`);
+      return 1;
+    }
+    const cliChecks: ReturnType<typeof parseCheckFlag>[] = [];
+    try {
+      for (let i = 0; i < argv.length; i++) {
+        if (argv[i] === '--check' && argv[i + 1]) cliChecks.push(parseCheckFlag(argv[i + 1], true));
+        if (argv[i] === '--optional-check' && argv[i + 1]) cliChecks.push(parseCheckFlag(argv[i + 1], false));
+      }
+    } catch (e) {
+      console.error((e as Error).message);
+      return 1;
+    }
+    const checks = resolveChecks(configured, cliChecks);
+    console.log(checks.length > 0 ? `checks: ${checks.map((c) => `${c.name}${c.required ? '' : ' (optional)'}`).join(', ')}` : 'checks: none configured (reviewer judgement only)');
     const task = engine.createTask({
       objective,
       reviewObjective: flag(argv, '--review-objective'),
@@ -316,6 +344,7 @@ export async function main(argv: string[]): Promise<number> {
       reviewerAgentId: reviewerId,
       workdir: coder.workdir,
       reviewFiles,
+      checks,
       maxIterations: Number(flag(argv, '--max-iterations') ?? 5),
       coderTimeoutMs: Number(flag(argv, '--coder-timeout') ?? 600000),
       reviewerTimeoutMs: Number(flag(argv, '--reviewer-timeout') ?? 300000),

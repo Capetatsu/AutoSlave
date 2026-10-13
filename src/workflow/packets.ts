@@ -3,6 +3,7 @@
  * Never forwards raw transcripts. Caps keep packets small and auditable.
  */
 import type { CompletionReport, Verdict } from './types.js';
+import type { CheckResult } from '../verify/checks.js';
 
 export const LIMITS = {
   planExcerpt: 4000,
@@ -30,6 +31,18 @@ function diffText(diff: DiffEntryLike[]): string {
   return cap(parts.join('\n'), LIMITS.diffChars);
 }
 
+function checksPacketSection(checks: CheckResult[] | undefined): string {
+  if (!checks || checks.length === 0) {
+    return 'DETERMINISTIC CHECKS: none configured for this task (reviewer judgement only).';
+  }
+  const lines = ['DETERMINISTIC CHECKS (facts — a failing REQUIRED check blocks approval even if you approve):'];
+  for (const r of checks) {
+    lines.push(`- [${r.required ? 'required' : 'optional'}] ${r.name}: ${r.status} (exit ${r.exitCode ?? 'n/a'}, ${r.durationMs}ms)`);
+    if (r.status !== 'pass') lines.push(`  excerpt: ${cap(r.excerpt, 1500)}`);
+  }
+  return lines.join('\n');
+}
+
 const REPORT_SCHEMA = `{"status":"complete|partial|blocked","summary":"...","filesChanged":["..."],"commandsRun":["..."],"knownGaps":["..."],"blockers":[]}`;
 const VERDICT_SCHEMA = `{"status":"approve","summary":"..."} OR {"status":"reject","summary":"...","issues":[{"id":"I1","severity":"high|medium|low","file":"...","description":"..."}],"next_actions":["concrete step 1","concrete step 2"]}`;
 
@@ -48,11 +61,35 @@ export function buildTaskAssign(objective: string, planExcerpt: string, workdir:
   ].join('\n');
 }
 
-/** Follow-up fix instructions built from a reject verdict. */
+/** Follow-up fix instructions when the reviewer approved but required checks failed. */
+export function buildChecksFeedback(
+  objective: string,
+  failures: CheckResult[],
+): string {
+  return [
+    `Your work was reviewed, but REQUIRED deterministic checks failed, so it cannot be approved yet. Fix the failures below in the project, then stop and wait.`,
+    ``,
+    `OBJECTIVE: ${objective}`,
+    ``,
+    ...checkFailureLines(failures),
+  ].join('\n');
+}
+
+function checkFailureLines(failures: CheckResult[]): string[] {
+  const lines = [`FAILING CHECKS (fix every required one):`];
+  for (const f of failures.slice(0, LIMITS.nextActions)) {
+    lines.push(`- [${f.required ? 'required' : 'optional'}] ${f.name} (\`${f.command}\`): ${f.status} (exit ${f.exitCode ?? 'n/a'}, ${f.durationMs}ms)`);
+    lines.push(`  output excerpt: ${cap(f.excerpt, 2000)}`);
+  }
+  return lines;
+}
+
+/** Follow-up fix instructions built from a reject verdict and/or check failures. */
 export function buildFeedbackApply(
   objective: string,
   planExcerpt: string,
   verdict: Extract<Verdict, { status: 'reject' }>,
+  checkFailures: CheckResult[] = [],
 ): string {
   const lines = [
     `The reviewer REJECTED your work. Apply the following actions in the project, then stop and wait.`,
@@ -67,6 +104,7 @@ export function buildFeedbackApply(
     `NEXT ACTIONS (do each of these):`,
     ...verdict.next_actions.slice(0, LIMITS.nextActions).map((a, i) => `${i + 1}. ${a}`),
     ``,
+    ...(checkFailures.length > 0 ? [...checkFailureLines(checkFailures), ``] : []),
     `PLAN (excerpt, for reference):`,
     cap(planExcerpt, LIMITS.planExcerpt),
   ];
@@ -99,6 +137,8 @@ export function buildReviewRequest(args: {
   extraFiles?: Array<{ file: string; content: string }>;
   /** The coder's scoped assignment (when the review objective is broader). */
   coderScope?: string;
+  /** Latest deterministic check results (facts for the reviewer). */
+  checks?: CheckResult[];
 }): string {
   const lines = [
     `You are an independent code reviewer in an AutoSlave review loop (iteration ${args.iteration}/${args.maxIterations}).`,
@@ -111,6 +151,8 @@ export function buildReviewRequest(args: {
     ``,
     `ACTUAL DIFF (source of truth — the coder's report is only a claim):`,
     diffText(args.diff),
+    ``,
+    checksPacketSection(args.checks),
     ``,
     `CODER REPORT: ${cap(JSON.stringify(args.report), LIMITS.reportSummary + 500)}`,
   ];

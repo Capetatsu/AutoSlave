@@ -36,6 +36,8 @@ export interface BusMessage {
   delivery?: { status: 'sent' | 'failed'; detail?: string; at?: string };
 }
 
+import type { CheckDef, CheckResult } from '../verify/checks.js';
+
 export interface Task {
   id: string;
   objective: string;
@@ -53,9 +55,13 @@ export interface Task {
   reviewerTimeoutMs: number;
   lastReport?: CompletionReport;
   lastVerdict?: Verdict;
-  lastDiffHash?: string;
-  lastIssueIds?: string[];
-  /** Repeat count of identical (issues, diff) across iterations — loop health. */
+  /** Configured deterministic checks (empty = reviewer judgement only). */
+  checks?: CheckDef[];
+  /** Results of the latest verification run (after the latest coder result). */
+  lastChecks?: CheckResult[];
+  /** Unified loop-health key (verdict + diff + checks fingerprints). */
+  lastProgressKey?: string;
+  /** Repeat count of identical progress keys across iterations — loop health. */
   stallCount?: number;
   /** Repo-relative paths (under workdir) whose current content joins each review packet. */
   reviewFiles?: string[];

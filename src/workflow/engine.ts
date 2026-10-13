@@ -19,12 +19,15 @@ import type { AgentRegistry } from '../registry/registry.js';
 import { StateStore, newId } from '../store/store.js';
 import type { ControlAction } from '../store/store.js';
 import {
+  buildChecksFeedback,
   buildFeedbackApply,
   buildReportRequest,
   buildReviewRequest,
   buildTaskAssign,
   buildVerdictRetry,
 } from './packets.js';
+import { auditSummary, runChecks } from '../verify/checks.js';
+import type { CheckDef, CheckResult } from '../verify/checks.js';
 import type {
   BusMessage,
   CompletionReport,
@@ -48,6 +51,8 @@ export interface EngineDeps {
   registry: AgentRegistry;
   store: StateStore;
   sleepMs?: (ms: number) => Promise<void>;
+  /** Injected for tests; defaults to the real verification runner. */
+  runChecksFn?: (workdir: string, checks: CheckDef[]) => Promise<CheckResult[]>;
 }
 
 const sleepDefault = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -60,6 +65,10 @@ function hashStr(s: string): string {
 
 function diffFingerprint(diff: DiffEntry[]): string {
   return hashStr(diff.map((d) => `${d.file}:${d.status}:${d.additions}:${d.deletions}:${d.patch.length}`).join('|'));
+}
+
+function checksFingerprint(checks: CheckResult[]): string {
+  return hashStr(checks.map((c) => `${c.name}:${c.status}:${c.exitCode ?? 'n/a'}`).join('|'));
 }
 
 export class WorkflowEngine {
@@ -291,6 +300,7 @@ export class WorkflowEngine {
     reviewerSession: string,
     toLabel: string,
     diff: DiffEntry[],
+    checks: CheckResult[],
   ): Promise<Verdict | null> {
     if ((await this.handleControl(task)) === 'stopped') return null;
     const diffBefore = (await this.deps.adapter.getDiff(reviewerSession)).length;
@@ -305,6 +315,7 @@ export class WorkflowEngine {
       report: task.lastReport as CompletionReport,
       previousVerdict: task.lastVerdict,
       extraFiles,
+      checks,
     });
     await this.sendMessage(task, 'review.request', 'autoslave', reviewerSession, toLabel, prompt, {
       iteration: task.iteration,
@@ -383,6 +394,57 @@ export class WorkflowEngine {
   }
 
   /**
+   * Run deterministic checks after a coder result. Results are stored on the
+   * task, audit-logged, and returned for the review packet. Checks run to
+   * completion once started (each is time-bounded); control requests apply at
+   * the next checkpoint.
+   */
+  private async runVerification(task: Task): Promise<CheckResult[]> {
+    const checks = task.checks ?? [];
+    if (checks.length === 0) {
+      this.audit(task, 'autoslave', 'checks.skipped', 'no verification checks configured (reviewer judgement only)');
+      task.lastChecks = [];
+      this.store.saveTask(task);
+      return [];
+    }
+    const runFn = this.deps.runChecksFn ?? runChecks;
+    const results = await runFn(task.workdir, checks);
+    task.lastChecks = results;
+    this.store.saveTask(task);
+    this.audit(task, 'autoslave', 'checks.done', auditSummary(results));
+    const failed = results.filter((r) => r.status !== 'pass');
+    if (failed.length > 0) {
+      this.audit(
+        task,
+        'autoslave',
+        'checks.failed',
+        failed.map((r) => `${r.name}=${r.status}: ${r.excerpt.slice(0, 500)}`).join(' | '),
+      );
+    }
+    return results;
+  }
+
+  /** Unified loop-health: true when nothing changed since the last iteration. */
+  private trackProgress(task: Task, key: string): 'progress' | 'stalled' {
+    if (task.lastProgressKey === key) {
+      task.stallCount = (task.stallCount ?? 0) + 1;
+    } else {
+      task.stallCount = 0;
+      task.lastProgressKey = key;
+    }
+    this.store.saveTask(task);
+    return (task.stallCount ?? 0) >= 1 ? 'stalled' : 'progress';
+  }
+
+  /** Shared cap check after a non-approving outcome. Null = may continue. */
+  private capReached(task: Task): string | null {
+    if (task.iteration >= task.maxIterations) {
+      return `iteration limit reached (${task.iteration}/${task.maxIterations})`;
+    }
+    return null;
+  }
+
+  /**
    * Run the full loop for a task in state CREATED. Returns the terminal state.
    * The caller creates the task via `createTask`.
    */
@@ -403,33 +465,59 @@ export class WorkflowEngine {
     let diff = first.diff;
 
     for (;;) {
+      // Verification runs after every coder result so the reviewer sees facts.
+      const checks = await this.runVerification(task);
       // REVIEWING.
       this.transition(task, 'REVIEWING', `iteration ${task.iteration}: requesting review`);
-      const verdict = await this.reviewerTurn(task, reviewer.sessionId, reviewerLabel, diff);
+      const verdict = await this.reviewerTurn(task, reviewer.sessionId, reviewerLabel, diff, checks);
       if (!verdict) return task.state;
 
       if (verdict.status === 'approve') {
-        this.transition(task, 'APPROVED', `reviewer approved at iteration ${task.iteration} (deterministic checks arrive in Phase 3)`);
-        return task.state;
+        const failedRequired = checks.filter((c) => c.required && c.status !== 'pass');
+        if (failedRequired.length === 0) {
+          this.transition(
+            task,
+            'APPROVED',
+            `reviewer approved at iteration ${task.iteration}; checks: ${checks.length > 0 ? auditSummary(checks) : 'none configured'}`,
+          );
+          return task.state;
+        }
+        // Gate rule (FEATURES §3.5): required checks veto an approval.
+        const names = failedRequired.map((c) => `${c.name}=${c.status}`).join(', ');
+        this.audit(task, 'autoslave', 'approval.blocked', `reviewer approved but required checks failed: ${names}`);
+        if (this.trackProgress(task, `B:${checksFingerprint(checks)}:${diffFingerprint(diff)}`) === 'stalled') {
+          this.escalate(task, 'checks failing repeatedly', `same failures with no change: ${names}`);
+          return task.state;
+        }
+        const cap = this.capReached(task);
+        if (cap) {
+          this.escalate(task, cap, `blocked by failing checks: ${names}`);
+          return task.state;
+        }
+        task.iteration += 1;
+        this.transition(task, 'FIXING', `approval blocked by checks (${names}), iteration ${task.iteration}/${task.maxIterations}`);
+        const fixed = await this.coderTurn(
+          task,
+          coder.sessionId,
+          buildChecksFeedback(task.objective, failedRequired),
+          'feedback.apply',
+          coderLabel,
+        );
+        if (!fixed) return task.state;
+        diff = fixed.diff;
+        continue;
       }
 
       // Reject: loop-health + iteration cap, then FIXING.
       const issueIds = [...verdict.issues.map((i) => i.id)].sort().join(',');
-      const fingerprint = diffFingerprint(diff);
-      if (task.lastIssueIds?.join(',') === issueIds && task.lastDiffHash === fingerprint) {
-        task.stallCount = (task.stallCount ?? 0) + 1;
-      } else {
-        task.stallCount = 0;
-      }
-      task.lastIssueIds = issueIds.split(',');
-      task.lastDiffHash = fingerprint;
-      this.store.saveTask(task);
-      if ((task.stallCount ?? 0) >= 1) {
+      const failures = checks.filter((c) => c.status !== 'pass');
+      if (this.trackProgress(task, `R:${issueIds}:${diffFingerprint(diff)}:${checksFingerprint(checks)}`) === 'stalled') {
         this.escalate(task, 'review loop stalled', 'same issues with no diff change across iterations');
         return task.state;
       }
-      if (task.iteration >= task.maxIterations) {
-        this.escalate(task, 'iteration limit reached', `${task.iteration}/${task.maxIterations}`);
+      const cap = this.capReached(task);
+      if (cap) {
+        this.escalate(task, cap, `last verdict=reject (${verdict.issues.length} issues)`);
         return task.state;
       }
       task.iteration += 1;
@@ -437,7 +525,7 @@ export class WorkflowEngine {
       const fixed = await this.coderTurn(
         task,
         coder.sessionId,
-        buildFeedbackApply(task.objective, task.planExcerpt, verdict),
+        buildFeedbackApply(task.objective, task.planExcerpt, verdict, failures),
         'feedback.apply',
         coderLabel,
       );
@@ -456,6 +544,7 @@ export class WorkflowEngine {
     workdir: string;
     reviewFiles?: string[];
     reviewObjective?: string;
+    checks?: CheckDef[];
     maxIterations?: number;
     coderTimeoutMs?: number;
     reviewerTimeoutMs?: number;
@@ -478,6 +567,7 @@ export class WorkflowEngine {
       workdir: args.workdir,
       reviewFiles: args.reviewFiles ?? [],
       reviewObjective: args.reviewObjective,
+      checks: args.checks ?? [],
     };
     this.store.saveTask(task);
     this.audit(task, 'autoslave', 'task.created', `objective="${task.objective}" maxIterations=${task.maxIterations}`);
