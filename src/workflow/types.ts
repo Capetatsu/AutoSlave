@@ -24,6 +24,8 @@ export type MessageType =
 
 export interface BusMessage {
   id: string;
+  /** Deterministic operation key (`i<iteration>:<step>`) for crash-safe redelivery. */
+  opId?: string;
   type: MessageType;
   taskId: string;
   from: string;
@@ -67,6 +69,26 @@ export interface Task {
   reviewFiles?: string[];
   /** Broader objective the reviewer judges against (defaults to the coder's objective). */
   reviewObjective?: string;
+  /** Isolated worktree for the writing agent (absent = in-place mode). */
+  worktree?: {
+    repoRoot: string;
+    branch: string;
+    path: string;
+    targetBranch: string;
+    baseSha: string;
+  };
+  /** Controlled-integration record (set once approved work is merged). */
+  integration?: {
+    sourceBranch: string;
+    targetBranch: string;
+    sha: string;
+    at: string;
+    already?: boolean;
+  };
+  /** Wall-clock budget in ms (default 30 min; 0/negative = unlimited). */
+  timeBudgetMs?: number;
+  /** Run start (budget measured from here, spans restarts). */
+  startedAt?: string;
   reason?: string;
   createdAt: string;
   updatedAt: string;

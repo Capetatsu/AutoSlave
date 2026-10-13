@@ -17,6 +17,7 @@ import type {
   InboxReceipt,
   InterruptResult,
   ModelRef,
+  PermissionRequestInfo,
   PromptBody,
   SessionInfo,
   SessionMessage,
@@ -188,6 +189,19 @@ export class OpenCodeAdapter {
     const r = await request<InterruptResult>('POST', `/api/session/${sessionID}/interrupt`);
     this.log({ op: 'abort', status: r.status, ms: r.ms, sessionID, interrupted: r.data.interrupted });
     return r.data.interrupted;
+  }
+
+  /** Pending permission requests for a session (often empty; see evidence). */
+  async listPermissions(sessionID: string): Promise<PermissionRequestInfo[]> {
+    const r = await request<{ data: PermissionRequestInfo[] }>('GET', `/api/session/${sessionID}/permission`);
+    this.log({ op: 'listPermissions', status: r.status, ms: r.ms, sessionID, count: r.data.data.length });
+    return r.data.data;
+  }
+
+  /** Answer one permission request. Decision must come from static policy. */
+  async replyPermission(sessionID: string, requestID: string, decision: 'once' | 'always' | 'reject'): Promise<void> {
+    const r = await request('POST', `/api/session/${sessionID}/permission/${requestID}/reply`, { decision });
+    this.log({ op: 'replyPermission', status: r.status, ms: r.ms, sessionID, requestID, decision });
   }
 
   /**

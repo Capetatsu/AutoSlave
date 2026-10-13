@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+const spec = JSON.parse(fs.readFileSync('spike/findings/openapi-2.0.28.json', 'utf8'));
+const S = spec.components.schemas;
+console.log('=== Permission.Rule:');
+console.log(JSON.stringify(S['Permission.Rule'], null, 1).slice(0, 1500));
+console.log('=== Permission.Ruleset:');
+console.log(JSON.stringify(S['Permission.Ruleset'], null, 1).slice(0, 500));
+console.log('=== Permission.Reply:');
+console.log(JSON.stringify(S['Permission.Reply'], null, 1).slice(0, 500));
+console.log('=== Permission.Request:');
+console.log(JSON.stringify(S['Permission.Request'], null, 1).slice(0, 1500));
+console.log('=== session.create permissions field:');
+const create = spec.paths['/api/session']['post'].requestBody.content['application/json'].schema;
+console.log(JSON.stringify(create.properties.permissions, null, 1).slice(0, 500));
+console.log('=== move op:');
+console.log(JSON.stringify(spec.paths['/api/session/{sessionID}/move'], null, 1).slice(0, 1200));

@@ -52,6 +52,18 @@ class FakeAdapter implements EngineAdapter {
   async abort(): Promise<boolean> {
     return true;
   }
+  async getHistory(): Promise<Array<{ id: string; type: string; time?: { created: number } }>> {
+    return [];
+  }
+  async getSession(): Promise<{ tokens?: { input: number; output: number } }> {
+    return { tokens: { input: 0, output: 0 } };
+  }
+  async listPermissions(): Promise<Array<{ id: string; action: string; resources: string[] }>> {
+    return [];
+  }
+  async replyPermission(): Promise<void> {
+    return;
+  }
 }
 
 const CODER = 'ses_coder';

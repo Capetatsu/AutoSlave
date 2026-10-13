@@ -106,6 +106,11 @@ export class StateStore {
     return this.data.messages.filter((m) => m.taskId === taskId);
   }
 
+  /** Find a persisted message by its idempotency key (crash-safe redelivery). */
+  findByOpId(taskId: string, opId: string): BusMessage | undefined {
+    return this.data.messages.find((m) => m.taskId === taskId && m.opId === opId);
+  }
+
   audit(entry: { task: string; agent: string; kind: string; detail: string }): void {
     const seq = this.nextSeq();
     fs.appendFileSync(

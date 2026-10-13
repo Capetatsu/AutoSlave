@@ -8,9 +8,11 @@ import { OpenCodeAdapter } from '../adapter/adapter.js';
 import { AgentRegistry } from '../registry/registry.js';
 import type { AgentRole } from '../registry/registry.js';
 import { discoverConnection } from '../adapter/client.js';
-import { StateStore, autoslaveHome } from '../store/store.js';
+import { StateStore, autoslaveHome, newId } from '../store/store.js';
 import { WorkflowEngine } from '../workflow/engine.js';
 import { loadChecks, parseCheckFlag, resolveChecks } from '../verify/checks.js';
+import { loadPolicy } from '../policy/policy.js';
+import { createWorktree, currentBranch, porcelain, repoRoot } from '../git/worktrees.js';
 import { readFileSync } from 'node:fs';
 
 function version(): string {
@@ -39,7 +41,9 @@ Usage:
                   [--max-iterations <n>] [--coder-timeout <ms>] [--reviewer-timeout <ms>]
                   [--reviewer-model <provider/model>] [--review-file <path>]
                   [--check "name=command"] [--optional-check "name=command"]
+                  [--worktree <repoRoot>] [--target-branch <name>] [--time-budget <ms>]
                   (plus autoslave.checks.json in the coder workdir)
+  autoslave recover <taskId>   (resume an interrupted task after a restart)
   autoslave status <agentId> | --task <taskId> | (lists tasks)
   autoslave log [--task <taskId>] [--lines <n>] [--follow]
   autoslave pause <taskId> | autoslave resume <taskId> | autoslave kill <taskId>
@@ -76,9 +80,14 @@ export async function main(argv: string[]): Promise<number> {
     let workdir = flag(rest, '--workdir') ?? process.cwd();
     let model = flag(rest, '--model');
     if (createDir) {
+      // Second layer: reviewer sessions are created with a deny-write ruleset
+      // to match the read-only policy. Live probes show OpenCode does not
+      // surface permission requests for in-tree writes, so this is strictly a
+      // backstop — enforcement is instruction + post-turn scope detection.
       const created = await adapter.createSession({
         title: flag(rest, '--title') ?? `autoslave-${role}`,
         location: { directory: createDir },
+        ...(role === 'reviewer' ? { permissions: [{ action: 'write', resource: '*', effect: 'deny' as const }] } : {}),
       });
       sessionId = created.id;
       workdir = createDir;
@@ -257,7 +266,7 @@ export async function main(argv: string[]): Promise<number> {
   if (cmd === 'run') {
     // NOTE: flags may start at `sub` position, so search the full argv.
     const objective = flag(argv, '--task');
-    const coderId = flag(argv, '--coder');
+    let coderId = flag(argv, '--coder');
     const reviewerId = flag(argv, '--reviewer');
     if (!objective || !coderId || !reviewerId) {
       console.error('usage: autoslave run --task "<objective>" [--plan <file>] --coder <agentId> --reviewer <agentId>');
@@ -281,13 +290,6 @@ export async function main(argv: string[]): Promise<number> {
     if (coder.workdir !== reviewer.workdir) {
       console.log(`warning: coder dir ${coder.workdir} != reviewer dir ${reviewer.workdir}; reviewing ${coder.workdir}`);
     }
-    // State/logs must live outside the agent workdir: session diffs attribute
-    // ANY file changed inside it during a turn (including our own raw.log).
-    const rel = path.relative(coder.workdir, home);
-    if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
-      console.error(`refusing: AutoSlave home ${home} is inside the coder workdir ${coder.workdir} — session diffs would be polluted. Set AUTOSLAVE_HOME to a directory outside it.`);
-      return 1;
-    }
     const reviewerModel = flag(argv, '--reviewer-model');
     if (reviewerModel) {
       const [providerID, ...restModel] = reviewerModel.split('/');
@@ -310,15 +312,70 @@ export async function main(argv: string[]): Promise<number> {
       }
     }
     const store = new StateStore();
-    const engine = new WorkflowEngine({ adapter, registry, store });
+    const { policy, source: policySource } = loadPolicy(home);
+    const engine = new WorkflowEngine({ adapter, registry, store, policy });
+    console.log(`policy: ${policySource === 'file' ? 'policy.json' : 'built-in defaults (reviewer read-only)'}`);
     const reviewFiles: string[] = [];
     for (let i = 0; i < argv.length; i++) {
       if (argv[i] === '--review-file' && argv[i + 1]) reviewFiles.push(argv[i + 1]);
     }
-    // Verification: per-project config file plus CLI overrides (CLI wins).
+
+    // Worktree isolation: the coder gets its own branch + worktree outside any
+    // checkout. The reviewer keeps its registered session and reads via packets.
+    let workdir = coder.workdir;
+    let worktree: { repoRoot: string; branch: string; path: string; targetBranch: string; baseSha: string } | undefined;
+    let precreatedId: string | undefined;
+    const wtRoot = flag(argv, '--worktree');
+    if (wtRoot) {
+      let root: string;
+      try {
+        root = repoRoot(wtRoot);
+      } catch (e) {
+        console.error(`--worktree is not inside a git repo: ${(e as Error).message}`);
+        return 1;
+      }
+      let targetBranch = flag(argv, '--target-branch');
+      try {
+        if (!targetBranch) targetBranch = currentBranch(root);
+      } catch (e) {
+        console.error(`cannot determine target branch: ${(e as Error).message}`);
+        return 1;
+      }
+      const taskId = newId('task');
+      const branch = `autoslave/${taskId.replace(/^task_/, '')}`;
+      try {
+        const wt = createWorktree(root, branch, `coder-${taskId.slice(-6)}`);
+        try {
+          if (porcelain(root) !== '') console.log(`warning: ${root} has uncommitted changes; coder branch starts at HEAD without them`);
+        } catch {
+          /* diagnostic only */
+        }
+        worktree = { repoRoot: root, branch, path: wt.path, targetBranch, baseSha: wt.baseSha };
+        const coderSession = await adapter.createSession({ title: `autoslave-coder-${taskId.slice(-6)}`, location: { directory: wt.path } });
+        const coderAgent = registry.add({ role: 'coder', sessionId: coderSession.id, serverUrl: discoverConnection().baseUrl, workdir: wt.path });
+        coderId = coderAgent.id;
+        workdir = wt.path;
+        precreatedId = taskId;
+        console.log(`worktree: ${branch} at ${wt.path} (target ${targetBranch}); coder=${coderAgent.id}`);
+      } catch (e) {
+        console.error(`worktree setup failed: ${(e as Error).message}`);
+        return 1;
+      }
+    }
+    // State/logs must live outside the agent workdir: session diffs attribute
+    // ANY file changed inside it during a turn (including our own raw.log).
+    {
+      const rel = path.relative(workdir, home);
+      if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
+        console.error(`refusing: AutoSlave home ${home} is inside the coder workdir ${workdir} — session diffs would be polluted. Set AUTOSLAVE_HOME to a directory outside it.`);
+        return 1;
+      }
+    }
+    // Verification: per-project config file (in the final workdir) plus CLI
+    // overrides (CLI wins).
     let configured: ReturnType<typeof loadChecks> = [];
     try {
-      configured = loadChecks(coder.workdir);
+      configured = loadChecks(workdir);
     } catch (e) {
       console.error(`invalid checks config: ${(e as Error).message}`);
       return 1;
@@ -336,15 +393,18 @@ export async function main(argv: string[]): Promise<number> {
     const checks = resolveChecks(configured, cliChecks);
     console.log(checks.length > 0 ? `checks: ${checks.map((c) => `${c.name}${c.required ? '' : ' (optional)'}`).join(', ')}` : 'checks: none configured (reviewer judgement only)');
     const task = engine.createTask({
+      id: precreatedId,
       objective,
       reviewObjective: flag(argv, '--review-objective'),
       planExcerpt,
       planPath,
       coderAgentId: coderId,
       reviewerAgentId: reviewerId,
-      workdir: coder.workdir,
+      workdir,
       reviewFiles,
       checks,
+      worktree,
+      timeBudgetMs: Number(flag(argv, '--time-budget') ?? 1800000),
       maxIterations: Number(flag(argv, '--max-iterations') ?? 5),
       coderTimeoutMs: Number(flag(argv, '--coder-timeout') ?? 600000),
       reviewerTimeoutMs: Number(flag(argv, '--reviewer-timeout') ?? 300000),
@@ -355,6 +415,22 @@ export async function main(argv: string[]): Promise<number> {
     console.log(`task ${task.id} terminal state: ${terminal}`);
     if (done?.reason) console.log(`reason: ${done.reason}`);
     return terminal === 'APPROVED' ? 0 : 1;
+  }
+
+  if (cmd === 'recover' && sub) {
+    const store = new StateStore();
+    const { policy } = loadPolicy(home);
+    const engine = new WorkflowEngine({ adapter, registry, store, policy });
+    try {
+      const terminal = await engine.resume(sub);
+      const done = store.getTask(sub);
+      console.log(`task ${sub} recovered → ${terminal}`);
+      if (done?.reason) console.log(`reason: ${done.reason}`);
+      return ['APPROVED'].includes(terminal) ? 0 : 1;
+    } catch (e) {
+      console.error(`recover failed: ${(e as Error).message}`);
+      return 1;
+    }
   }
 
   console.error(help());

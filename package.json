@@ -14,10 +14,11 @@
     "spike": "node spike/autoslave-spike.mjs",
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/test/",
-    "test:unit": "npm run build && node --test dist/test/adapter-normalize.test.js dist/test/registry.test.js dist/test/workflow.test.js dist/test/cli-launcher.test.js dist/test/verify.test.js dist/test/verify-gate.test.js",
+    "test:unit": "npm run build && node --test dist/test/adapter-normalize.test.js dist/test/registry.test.js dist/test/workflow.test.js dist/test/cli-launcher.test.js dist/test/verify.test.js dist/test/verify-gate.test.js dist/test/git-worktrees.test.js dist/test/policy.test.js dist/test/verify-kill.test.js dist/test/recovery.test.js",
     "test:contract": "npm run build && node --test dist/test/contract.test.js",
     "test:phase2": "npm run build && node --test dist/test/phase2-contract.test.js",
     "test:phase3": "npm run build && node --test dist/test/phase3-contract.test.js",
+    "test:phase4": "npm run build && node --test dist/test/phase4-contract.test.js",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

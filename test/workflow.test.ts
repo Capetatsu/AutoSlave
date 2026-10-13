@@ -46,6 +46,7 @@ class FakeAdapter implements EngineAdapter {
   private queues = new Map<string, TurnResult[]>();
   diffs = new Map<string, DiffEntry[]>();
   aborted: string[] = [];
+  replied: string[] = [];
 
   script(sessionID: string, turns: TurnResult[]): void {
     this.queues.set(sessionID, [...turns]);
@@ -70,6 +71,22 @@ class FakeAdapter implements EngineAdapter {
   async abort(sessionID: string): Promise<boolean> {
     this.aborted.push(sessionID);
     return true;
+  }
+
+  async getHistory(): Promise<Array<{ id: string; type: string; time?: { created: number } }>> {
+    return [];
+  }
+
+  async getSession(): Promise<{ tokens?: { input: number; output: number } }> {
+    return { tokens: { input: 0, output: 0 } };
+  }
+
+  async listPermissions(): Promise<Array<{ id: string; action: string; resources: string[] }>> {
+    return [];
+  }
+
+  async replyPermission(): Promise<void> {
+    this.replied.push('reply');
   }
 }
 

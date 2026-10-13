@@ -19,6 +19,17 @@ export interface CreateSessionBody {
   agent?: string;
   model?: ModelRef;
   location?: { directory: string };
+  /** Static permission ruleset (second layer; see Phase 4 evidence for limits). */
+  permissions?: Array<{ action: string; resource: string; effect: 'allow' | 'deny' | 'ask' }>;
+}
+
+/** One entry of `GET /api/session/{id}/permission` → `data[]`. */
+export interface PermissionRequestInfo {
+  id: string;
+  sessionID: string;
+  action: string;
+  resources: string[];
+  [key: string]: unknown;
 }
 
 /** `GET /api/session/{id}` → `data`. Optional fields are omitted by the server. */
